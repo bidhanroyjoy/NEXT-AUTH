@@ -3,9 +3,8 @@ package main
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"net/http"
-
-	"github.com/gin-gonic/gin"
 )
 
 // GenerateRandomBytes returns securely generated random bytes.
@@ -24,61 +23,56 @@ func GenerateRandomString(s int) (string, error) {
 	return base64.URLEncoding.EncodeToString(b), err
 }
 
-// CSRFMiddleware handles generating and validating CSRF tokens
-func CSRFMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
+// CSRFMiddleware validates CSRF tokens for state-mutating requests
+func CSRFMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		// For safe methods, generate a token if not present
-		if c.Request.Method == "GET" || c.Request.Method == "HEAD" || c.Request.Method == "OPTIONS" {
-			csrfToken, _ := c.Cookie("csrf_token")
-			if csrfToken == "" {
+		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+			cookie, _ := r.Cookie("csrf_token")
+			if cookie == nil {
 				newToken, _ := GenerateRandomString(32)
-				c.SetCookie("csrf_token", newToken, 3600, "/", "localhost", false, false) // Not HttpOnly
+				http.SetCookie(w, &http.Cookie{
+					Name:     "csrf_token",
+					Value:    newToken,
+					Path:     "/",
+					MaxAge:   3600,
+					HttpOnly: false,
+				})
 			}
-			c.Next()
+			next(w, r)
 			return
 		}
 
-		// For state-mutating methods, validate the token, but skip for certain auth routes
-		// like login and register where the user is just establishing their session
-		path := c.Request.URL.Path
-		if path == "/api/auth/login" || path == "/api/auth/register" || path == "/api/auth/verify-email" || path == "/api/auth/forgot-password" || path == "/api/auth/reset-password" {
-			c.Next()
+		// Validate CSRF token for state-mutating methods
+		csrfCookie, err := r.Cookie("csrf_token")
+		csrfHeader := r.Header.Get("X-CSRF-Token")
+
+		if err != nil || csrfHeader == "" || csrfCookie.Value != csrfHeader {
+			writeError(w, http.StatusForbidden, "CSRF token mismatch or missing")
 			return
 		}
 
-		csrfCookie, err := c.Cookie("csrf_token")
-		csrfHeader := c.GetHeader("X-CSRF-Token")
-
-		if err != nil || csrfHeader == "" || csrfCookie != csrfHeader {
-			c.JSON(http.StatusForbidden, gin.H{"error": "CSRF token mismatch or missing"})
-			c.Abort()
-			return
-		}
-
-		c.Next()
+		next(w, r)
 	}
 }
 
-// RequireAuth middleware to validate access token
-func RequireAuth() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" || len(authHeader) < 8 || authHeader[:7] != "Bearer " {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing or invalid"})
-			c.Abort()
-			return
-		}
+// formatUint converts a uint to string for passing in headers
+func formatUint(n uint) string {
+	return fmt.Sprintf("%d", n)
+}
 
-		tokenStr := authHeader[7:]
-		claims, err := ValidateToken(tokenStr, false)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid access token"})
-			c.Abort()
-			return
-		}
+// parseUint parses a string to uint
+func parseUint(s string) uint {
+	var n uint
+	fmt.Sscanf(s, "%d", &n)
+	return n
+}
 
-		c.Set("userID", claims.UserID)
-		c.Set("userEmail", claims.Email)
-		c.Next()
+// getCookie retrieves a cookie value by name
+func getCookie(r *http.Request, name string) string {
+	cookie, err := r.Cookie(name)
+	if err != nil {
+		return ""
 	}
+	return cookie.Value
 }
