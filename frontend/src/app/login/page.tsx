@@ -147,6 +147,12 @@ export default function LoginPage() {
                 {loading ? "Signing in..." : show2FA ? "Verify & Sign in" : "Sign in"}
               </button>
             </div>
+
+            <div className="text-center">
+              <Link href="/setup-2fa" className="text-sm font-medium text-green-600 hover:text-green-500">
+                🔐 Setup Google Authenticator (2FA)
+              </Link>
+            </div>
           </form>
         </div>
       </div>

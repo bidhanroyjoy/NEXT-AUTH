@@ -19,9 +19,13 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setIsError(false);
     try {
-      await api.post("/auth/forgot-password", { email });
+      const res = await api.post("/auth/forgot-password", { email });
       setStep(2);
-      setMsg("If the email is registered, an OTP has been sent.");
+      setMsg(res.data.message || "If the email is registered, an OTP has been sent.");
+      // Auto-fill OTP if returned (dev mode, SMTP not configured)
+      if (res.data.otp) {
+        setOtp(res.data.otp);
+      }
     } catch (err: any) {
       setIsError(true);
       setMsg(err.response?.data?.error || "Failed to send OTP");

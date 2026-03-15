@@ -19,9 +19,13 @@ export default function RegisterPage() {
     e.preventDefault();
     setIsError(false);
     try {
-      await api.post("/auth/register", { email, password });
+      const res = await api.post("/auth/register", { email, password });
       setStep(2);
-      setMsg("Registration recorded. Please check your email (or console) for the OTP.");
+      setMsg(res.data.message || "Registration recorded. Please check your email for the OTP.");
+      // Auto-fill OTP if returned (dev mode, SMTP not configured)
+      if (res.data.otp) {
+        setOtp(res.data.otp);
+      }
     } catch (err: any) {
       setIsError(true);
       setMsg(err.response?.data?.error || "Registration failed");
