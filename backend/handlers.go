@@ -64,12 +64,20 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send Email with OTP
-	if err := SendEmail(user.Email, "Verify your email", fmt.Sprintf("Your OTP code is: %s", otpCode)); err != nil {
+	isMock, err := SendEmail(user.Email, "Verify your email", fmt.Sprintf("Your OTP code is: %s", otpCode))
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Registration successful but failed to send OTP email. Please try again.")
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, map[string]string{"message": "Registration successful. Please verify your email using the OTP sent."})
+	response := map[string]interface{}{
+		"message": "Registration successful. Please verify your email using the OTP sent.",
+	}
+	if isMock {
+		response["otp"] = otpCode
+		response["message"] = "Registration successful. SMTP not configured — use the OTP shown below."
+	}
+	writeJSON(w, http.StatusCreated, response)
 }
 
 // VerifyOTP verifies the OTP submitted for email registration

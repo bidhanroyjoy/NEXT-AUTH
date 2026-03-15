@@ -59,12 +59,20 @@ func ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	DB.Create(&otp)
 
 	// Send Email with OTP
-	if err := SendEmail(user.Email, "Password Reset", fmt.Sprintf("Your password reset code is: %s", otpCode)); err != nil {
+	isMock, err := SendEmail(user.Email, "Password Reset", fmt.Sprintf("Your password reset code is: %s", otpCode))
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to send password reset email. Please try again.")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"message": "If this email is registered, an OTP has been sent."})
+	response := map[string]interface{}{
+		"message": "If this email is registered, an OTP has been sent.",
+	}
+	if isMock {
+		response["otp"] = otpCode
+		response["message"] = "SMTP not configured — use the OTP shown below."
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 // ResetPassword verifies the OTP and updates the password

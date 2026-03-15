@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -40,23 +41,25 @@ func GenerateOTP() (string, error) {
 	return fmt.Sprintf("%06d", n.Int64()), nil
 }
 
-// SendEmail sends an email using SMTP via gomail
-func SendEmail(to, subject, body string) error {
+// SendEmail sends an email using SMTP via gomail.
+// Returns (isMock, err). isMock=true means email was logged, not actually sent.
+func SendEmail(to, subject, body string) (bool, error) {
 	smtpHost := os.Getenv("SMTP_HOST")
 	smtpPortStr := os.Getenv("SMTP_PORT")
 	smtpUser := os.Getenv("SMTP_USER")
 	smtpPass := os.Getenv("SMTP_PASS")
 	fromEmail := os.Getenv("SMTP_FROM")
 
-	if smtpHost == "" || smtpPortStr == "" || smtpUser == "" || smtpPass == "" {
-		log.Printf("\n--- MOCK EMAIL (Missing SMTP config) ---\nTo: %s\nSubject: %s\nBody: %s\n------------------\n", to, subject, body)
-		return nil
+	if smtpHost == "" || smtpPortStr == "" || smtpUser == "" || smtpPass == "" ||
+		strings.HasPrefix(smtpPass, "REPLACE") || strings.HasPrefix(smtpPass, "your_") {
+		log.Printf("\n--- MOCK EMAIL (SMTP not configured) ---\nTo: %s\nSubject: %s\nBody: %s\n------------------\n", to, subject, body)
+		return true, nil
 	}
 
 	smtpPort, err := strconv.Atoi(smtpPortStr)
 	if err != nil {
 		log.Printf("Invalid SMTP_PORT value: %s", smtpPortStr)
-		return fmt.Errorf("invalid SMTP port: %s", smtpPortStr)
+		return false, fmt.Errorf("invalid SMTP port: %s", smtpPortStr)
 	}
 
 	if fromEmail == "" {
@@ -73,10 +76,10 @@ func SendEmail(to, subject, body string) error {
 
 	if err := d.DialAndSend(m); err != nil {
 		log.Printf("Failed to send email to %s: %v", to, err)
-		return err
+		return false, err
 	}
 	log.Printf("Email successfully sent to %s", to)
-	return nil
+	return false, nil
 }
 
 // JWT Claims struct
