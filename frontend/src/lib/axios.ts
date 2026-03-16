@@ -2,7 +2,7 @@ import axios from 'axios';
 import { getSession } from 'next-auth/react';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8080/api', // Backend base URL
+  baseURL: process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL}/api` : 'http://127.0.0.1:8080/api', // Backend base URL
   withCredentials: true, // Crucial for sending HttpOnly Refresh token & reading CSRF
 });
 
@@ -50,7 +50,7 @@ api.interceptors.response.use(
 
       try {
         // Request token refresh (Backend checks HttpOnly cookie automatically appended)
-        const res = await axios.post('http://localhost:8080/api/auth/refresh', {}, { withCredentials: true });
+        const res = await axios.post(process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL}/api/auth/refresh` : 'http://127.0.0.1:8080/api/auth/refresh', {}, { withCredentials: true });
 
         if (res.status === 200 && res.data.access_token) {
           // Retry original request with newly obtained access_token
